@@ -30,7 +30,7 @@ jobs:
       - if: failure()
         run: python3 .github/scripts/junit-annotate.py junit.xml
 
-  # Prove the signatures against real servers: MinIO speaks the S3 API
+  # Prove the signatures against real servers: SeaweedFS speaks the S3 API
   # (SigV4), Azurite is Microsoft's Blob Storage emulator (SAS).
   interop:
     needs: test
