@@ -34,13 +34,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     services:
-      minio:
-        image: minio/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports: ["9000:9000"]
-        options: --entrypoint "minio" --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1" --health-interval 5s --health-retries 20
       azurite:
         image: mcr.microsoft.com/azure-storage/azurite
         ports: ["10000:10000"]
@@ -51,9 +44,9 @@ jobs:
           php-version: "8.3"
           extensions: curl
       - run: composer install --no-interaction --no-progress --no-dev
-      - name: Start MinIO server process and create bucket
+      - name: Start MinIO and create a bucket
         run: |
-          docker exec "${{ job.services.minio.id }}" sh -c 'nohup minio server /data >/tmp/minio.log 2>&1 &' || true
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio server /data
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
           docker run --rm --network host --entrypoint sh minio/mc -c \
             "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/roundtrip-bucket"
