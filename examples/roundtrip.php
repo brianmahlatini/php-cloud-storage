@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * End-to-end check against real S3-compatible and Azure-compatible servers
- * (MinIO and Azurite in CI): presign an upload, PUT bytes with plain HTTP as
+ * (SeaweedFS and Azurite in CI): presign an upload, PUT bytes with plain HTTP as
  * a browser would, presign a download, GET them back, compare.
  *
  * Usage: php examples/roundtrip.php s3|azure
@@ -36,7 +36,7 @@ function http(string $method, string $url, array $headers = [], ?string $body = 
 }
 
 $storage = match ($argv[1] ?? '') {
-    's3' => new S3Presigner(new Credentials('minioadmin', 'minioadmin'), 'roundtrip-bucket', 'us-east-1', 'http://127.0.0.1:9000'),
+    's3' => new S3Presigner(new Credentials('s3test', 's3test-secret'), 'roundtrip-bucket', 'us-east-1', 'http://127.0.0.1:8333'),
     'azure' => new AzureBlobSas('devstoreaccount1', 'Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==', 'roundtrip', 'http://127.0.0.1:10000/devstoreaccount1'),
     default => (fwrite(STDERR, "usage: roundtrip.php s3|azure\n") && exit(2)),
 };

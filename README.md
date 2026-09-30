@@ -2,7 +2,7 @@
 
 Dependency-free PHP 8.3 library that issues **presigned upload and download URLs for AWS S3 (Signature Version 4) and Azure Blob Storage (service SAS)** behind one interface. Browsers upload straight to the cloud, so file bytes never pass through your PHP servers.
 
-The S3 signer reproduces AWS's **published reference signature byte for byte**. CI then proves both signers against real servers, **MinIO** (S3 API) and **Azurite** (Azure's official emulator): upload, download, and rejection of a tampered URL.
+The S3 signer reproduces AWS's **published reference signature byte for byte**. CI then proves both signers against real servers, **SeaweedFS** (S3 API with signature checking) and **Azurite** (Azure's official emulator): upload, download, and rejection of a tampered URL.
 
 ```php
 $storage = new S3Presigner(new Credentials($keyId, $secret, $sessionToken), 'my-uploads', 'eu-west-1');
@@ -39,7 +39,7 @@ $download = $storage->downloadUrl("users/{$userId}/avatar.png", 60, downloadFile
 |---|---|
 | AWS reference vector | SigV4 canonical request, string to sign and signing-key derivation are exactly right |
 | Unit tests (15) | Signed headers, session tokens, filename sanitising, path-style endpoints, Azure string-to-sign, permissions, TTL and name validation, secret redaction |
-| Interop in CI | Real `PUT`/`GET` against MinIO and Azurite; a modified URL is rejected by the server |
+| Interop in CI | Real `PUT`/`GET` against SeaweedFS and Azurite; a modified URL is rejected by the server |
 | Static analysis | PHPStan level 9, PHP-CS-Fixer (PER-CS 2.0), PHP 8.3 and 8.4 |
 
 The Azure account key in the tests is Azurite's publicly documented development key, not a real credential.

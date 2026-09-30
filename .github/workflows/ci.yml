@@ -46,17 +46,21 @@ jobs:
           php-version: "8.3"
           extensions: curl
       - run: composer install --no-interaction --no-progress --no-dev
-      - name: Start MinIO and create a bucket
+      - name: Start SeaweedFS (S3 API with SigV4 auth) and create a bucket
+        env:
+          AWS_ACCESS_KEY_ID: s3test
+          AWS_SECRET_ACCESS_KEY: s3test-secret
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          set -o pipefail
-          fail() { echo "::error title=minio::$1 $(tr '\n' '|' < /tmp/out | tail -c 1500)"; exit 1; }
-          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-            quay.io/minio/minio server /data >/tmp/out 2>&1 || fail "docker run failed:"
-          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
-          docker logs minio >/tmp/out 2>&1 || true
-          docker run --rm --network host --entrypoint sh quay.io/minio/mc -c \
-            "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/roundtrip-bucket" >/tmp/out 2>&1 \
-            || fail "bucket creation failed:"
+          fail() { echo "::error title=seaweedfs::$1 $(tr '\n' '|' < /tmp/out | tail -c 1500)"; exit 1; }
+          cat > /tmp/s3.json <<'JSON'
+          {"identities":[{"name":"ci","credentials":[{"accessKey":"s3test","secretKey":"s3test-secret"}],"actions":["Admin","Read","Write","List","Tagging"]}]}
+          JSON
+          docker run -d --name seaweedfs -p 8333:8333 -v /tmp/s3.json:/etc/s3.json:ro \
+            chrislusf/seaweedfs server -s3 -s3.config=/etc/s3.json >/tmp/out 2>&1 || fail "docker run failed:"
+          for _ in $(seq 1 60); do aws --endpoint-url http://127.0.0.1:8333 s3 ls >/tmp/out 2>&1 && break; sleep 2; done
+          aws --endpoint-url http://127.0.0.1:8333 s3 mb s3://roundtrip-bucket >/tmp/out 2>&1 \
+            || { docker logs --tail 40 seaweedfs >>/tmp/out 2>&1; fail "bucket creation failed:"; }
       - name: Create Azurite container
         run: az storage container create --name roundtrip --connection-string "UseDevelopmentStorage=true;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1"
       - run: php examples/roundtrip.php s3
