@@ -26,7 +26,9 @@ jobs:
         env:
           PHP_CS_FIXER_IGNORE_ENV: "1"
       - run: phpstan analyse --no-progress
-      - run: vendor/bin/phpunit --coverage-text
+      - run: vendor/bin/phpunit --coverage-text --log-junit junit.xml
+      - if: failure()
+        run: python3 .github/scripts/junit-annotate.py junit.xml
 
   # Prove the signatures against real servers: MinIO speaks the S3 API
   # (SigV4), Azurite is Microsoft's Blob Storage emulator (SAS).
