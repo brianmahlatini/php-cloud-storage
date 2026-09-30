@@ -48,10 +48,15 @@ jobs:
       - run: composer install --no-interaction --no-progress --no-dev
       - name: Start MinIO and create a bucket
         run: |
-          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio server /data
+          set -o pipefail
+          fail() { echo "::error title=minio::$1 $(tr '\n' '|' < /tmp/out | tail -c 1500)"; exit 1; }
+          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            quay.io/minio/minio server /data >/tmp/out 2>&1 || fail "docker run failed:"
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
-          docker run --rm --network host --entrypoint sh minio/mc -c \
-            "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/roundtrip-bucket"
+          docker logs minio >/tmp/out 2>&1 || true
+          docker run --rm --network host --entrypoint sh quay.io/minio/mc -c \
+            "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/roundtrip-bucket" >/tmp/out 2>&1 \
+            || fail "bucket creation failed:"
       - name: Create Azurite container
         run: az storage container create --name roundtrip --connection-string "UseDevelopmentStorage=true;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1"
       - run: php examples/roundtrip.php s3
