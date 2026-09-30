@@ -1,0 +1,63 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ["8.3", "8.4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: pcov
+          tools: phpstan, php-cs-fixer
+      - run: composer validate --strict
+      - run: composer install --no-interaction --no-progress
+      - run: php-cs-fixer fix --dry-run --diff
+        env:
+          PHP_CS_FIXER_IGNORE_ENV: "1"
+      - run: phpstan analyse --no-progress
+      - run: vendor/bin/phpunit --coverage-text
+
+  # Prove the signatures against real servers: MinIO speaks the S3 API
+  # (SigV4), Azurite is Microsoft's Blob Storage emulator (SAS).
+  interop:
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports: ["9000:9000"]
+        options: --entrypoint "minio" --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1" --health-interval 5s --health-retries 20
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports: ["10000:10000"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl
+      - run: composer install --no-interaction --no-progress --no-dev
+      - name: Start MinIO server process and create bucket
+        run: |
+          docker exec "${{ job.services.minio.id }}" sh -c 'nohup minio server /data >/tmp/minio.log 2>&1 &' || true
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:9000/minio/health/live && break; sleep 1; done
+          docker run --rm --network host --entrypoint sh minio/mc -c \
+            "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/roundtrip-bucket"
+      - name: Create Azurite container
+        run: az storage container create --name roundtrip --connection-string "UseDevelopmentStorage=true;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1"
+      - run: php examples/roundtrip.php s3
+      - run: php examples/roundtrip.php azure

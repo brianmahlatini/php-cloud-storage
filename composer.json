@@ -1,0 +1,12 @@
+{
+    "name": "brianmahlatini/php-cloud-storage",
+    "description": "Dependency-free presigned upload/download URLs for AWS S3 (SigV4) and Azure Blob Storage (SAS)",
+    "type": "library",
+    "license": "MIT",
+    "authors": [{ "name": "Brian Mahlatini" }],
+    "require": { "php": ">=8.3" },
+    "require-dev": { "phpunit/phpunit": "^11.5" },
+    "autoload": { "psr-4": { "CloudStorage\\": "src/" } },
+    "autoload-dev": { "psr-4": { "CloudStorage\\Tests\\": "tests/" } },
+    "config": { "sort-packages": true }
+}
